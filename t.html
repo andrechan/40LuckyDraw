@@ -180,7 +180,7 @@ Jimmy"></textarea>
                 } else if (line.startsWith('last round name:')) {
                     const lastRound = line.slice('last round name:'.length).trim();
                     if (lastRound) roundNames.push(lastRound);
-                } else if (line.startsWith('the rest members:')) {
+                } else if (line.startsWith('lucky draw effect time:')) {
                     const timeStr = line.slice('lucky draw effect time:'.length).trim();
 					console.log(timeStr);
 				    effectTime = parseInt(timeStr, 10);
