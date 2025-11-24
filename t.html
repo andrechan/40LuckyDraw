@@ -186,6 +186,7 @@ Jimmy"></textarea>
 				    effectTime = parseInt(timeStr, 10);
                 } else if (line.startsWith('the rest members name:')) {
                     restMember = line.slice('the rest members name:'.length).trim();
+					console.log(restMember);
                 } else if (line === 'Members list:') {
                     isCollectingMembers = true;
                 } else if (isCollectingMembers) {
