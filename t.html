@@ -182,7 +182,8 @@ Jimmy"></textarea>
                     if (lastRound) roundNames.push(lastRound);
                 } else if (line.startsWith('the rest members:')) {
                     const timeStr = line.slice('the rest members:'.length).trim();
-                    effectTime = parseInt(timeStr, 10);
+					console.log(timeStr);
+				    effectTime = parseInt(timeStr, 10);
                 } else if (line.startsWith('the rest members name:')) {
                     restMember = line.slice('the rest members name:'.length).trim();
                 } else if (line === 'Members list:') {
