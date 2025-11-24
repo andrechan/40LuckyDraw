@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>抽奖音效测试</title>
     <style>
-        /* 内联样式，适配移动端 */
         body {
             display: flex;
             flex-direction: column;
@@ -33,8 +32,8 @@
 </head>
 <body>
     <button id="play-btn">播放抽奖音效</button>
-    <!-- 免费可商用音效：Mixkit胜利提示音（直接引用在线资源） -->
-    <audio id="lucky-sound" preload="auto" src="https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3"></audio>
+    <!-- 修复：替换为Mixkit稳定可商用的金币音效链接 -->
+    <audio id="lucky-sound" preload="auto" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3"></audio>
 
     <script>
         const btn = document.getElementById('play-btn');
