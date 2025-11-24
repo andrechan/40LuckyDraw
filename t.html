@@ -197,7 +197,8 @@ Jimmy"></textarea>
             const errors = [];
             if (!title) errors.push('缺少标题（Title项）');
             if (roundNames.length === 0) errors.push('缺少轮次名称（round x name/last round name项）');
-            if (!restMember) errors.push('缺少安慰奖名称（the rest members name项）');
+console.log(restMember);           
+		   if (!restMember) errors.push('缺少安慰奖名称（the rest members name项）');
             if (isNaN(effectTime) || effectTime <= 0) errors.push('抽奖时长必须为正整数');
             if (members.length === 0) errors.push('缺少成员列表（Members list项）');
 
