@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>自定义抽奖程序（含音效）</title>
+    <title>自定义抽奖程序（含音效测试）</title>
     <style>
         /* 原有样式保持不变 */
         * { box-sizing: border-box; margin:0; padding:0; font-family: 'Arial', sans-serif; }
@@ -73,6 +73,8 @@ Jimmy"></textarea>
             <div class="current-round" id="current-round"></div>
             <button class="start-btn" id="start-btn">開始抽獎</button>
             <button class="member-btn" id="view-members-btn">參與名單</button>
+            <!-- 新增：音效测试按钮 -->
+            <button class="member-btn" id="test-sound-btn">测试音效</button>
             <button class="end-round-btn" id="end-round-btn" disabled>結束當前輪次</button>
         </div>
     </div>
@@ -145,6 +147,7 @@ Jimmy"></textarea>
         const submitConfigBtn = document.getElementById('submit-config');
         const scrollHighlight = document.querySelector('.scroll-highlight');
         const viewMembersBtn = document.getElementById('view-members-btn');
+        const testSoundBtn = document.getElementById('test-sound-btn'); // 新增：获取测试按钮
         const membersModal = document.getElementById('members-modal');
         const closeModalBtns = document.querySelectorAll('.close-modal');
         const modalMembersTextarea = document.getElementById('modal-members-textarea');
@@ -356,7 +359,7 @@ Jimmy"></textarea>
             }
         });
 
-        // 开始抽奖逻辑（新增音效播放）
+        // 开始抽奖逻辑（原有逻辑不变）
         startBtn.addEventListener('click', () => {
             if (currentRoundIndex >= 抽奖轮次.length) {
                 alert('所有輪次已完成！');
@@ -386,7 +389,7 @@ Jimmy"></textarea>
             }, effectTimeMs);
         });
 
-        // 停止抽奖逻辑（新增音效播放）
+        // 停止抽奖逻辑（原有逻辑不变）
         function stopScroll() {
             const scrollList = document.getElementById('scroll-list');
             if (remainingNames.length === 0) {
@@ -415,7 +418,7 @@ Jimmy"></textarea>
             startBtn.disabled = false;
         }
 
-        // 显示中奖结果逻辑（新增音效播放）
+        // 显示中奖结果逻辑（原有逻辑不变）
         function showCenterFlipResult(name) {
             centerFlipBack.textContent = name;
             centerFlipCard.style.display = 'block';
@@ -457,6 +460,27 @@ Jimmy"></textarea>
                 alert(`🎉 所有輪次完成！未中獎者自動成為${restMemberName}得主！`);
             } else {
                 alert(`✅ 已完成${抽奖轮次[currentRoundIndex-1]}，即將進入${抽奖轮次[currentRoundIndex]}！`);
+            }
+        });
+
+        // 新增：音效测试按钮逻辑
+        testSoundBtn.addEventListener('click', async () => {
+            try {
+                // 1. 播放开始音效并等待结束
+                await startAudio.play();
+                await new Promise(resolve => startAudio.addEventListener('ended', resolve, { once: true }));
+                
+                // 2. 播放停止音效并等待结束
+                await stopAudio.play();
+                await new Promise(resolve => stopAudio.addEventListener('ended', resolve, { once: true }));
+                
+                // 3. 播放中奖音效
+                await winAudio.play();
+                
+                alert('音效测试成功！');
+            } catch (error) {
+                console.error('音效测试失败:', error);
+                alert('部分音效无法播放，请检查浏览器音频设置或网络连接');
             }
         });
     </script>
