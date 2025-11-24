@@ -1,47 +1,111 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>抽奖音效测试</title>
+    <title>本地音效测试工具</title>
     <style>
         body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            background: #f5f5f5;
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+            line-height: 1.6;
         }
-        #play-btn {
-            padding: 18px 40px;
-            font-size: 22px;
-            font-weight: bold;
+        .container {
+            background: #f9f9f9;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #playBtn {
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            background: #2c3e50;
             color: white;
-            background: #ff7a00;
             border: none;
-            border-radius: 16px;
+            border-radius: 8px;
             cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            transition: transform 0.2s ease;
+            transition: background 0.3s;
         }
-        #play-btn:hover { transform: scale(1.05); }
-        #play-btn:active { transform: scale(0.98); }
+        #playBtn:hover {
+            background: #34495e;
+        }
+        .status {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .success { color: #27ae60; background: #e8f5e9; }
+        .error { color: #e74c3c; background: #ffebee; }
+        .loading { color: #f39c12; background: #fff3e0; }
+        .note {
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
     </style>
 </head>
 <body>
-    <button id="play-btn">播放抽奖音效</button>
-    <!-- 修复：替换为Mixkit稳定可商用的金币音效链接 -->
-    <audio id="lucky-sound" preload="auto" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3"></audio>
+    <div class="container">
+        <h2>抽奖音效测试工具</h2>
+        <button id="playBtn">播放抽奖音效</button>
+        <div id="statusArea" class="status">等待操作...</div>
+        
+        <!-- 多格式音频备选：MP3（主流）+ OGG（兼容小众浏览器） -->
+        <audio id="soundPlayer" preload="auto">
+            <source src="snd1.wav" type="audio/wav">
+            您的浏览器不支持音频播放功能，请升级浏览器。
+        </audio>
+    </div>
 
     <script>
-        const btn = document.getElementById('play-btn');
-        const sound = document.getElementById('lucky-sound');
-        
-        btn.addEventListener('click', () => {
-            sound.currentTime = 0; // 重置音效到开头
-            sound.play().catch(err => alert(`音效播放失败：${err.message}`));
+        const playBtn = document.getElementById('playBtn');
+        const soundPlayer = document.getElementById('soundPlayer');
+        const statusArea = document.getElementById('statusArea');
+
+        // 更新状态显示
+        function updateStatus(text, type) {
+            statusArea.textContent = text;
+            statusArea.className = `status ${type}`;
+        }
+
+        // 音频加载成功监听
+        soundPlayer.addEventListener('loadeddata', () => {
+            updateStatus("音效已加载完成，点击按钮播放", "success");
+        });
+
+        // 音频加载失败监听
+        soundPlayer.addEventListener('error', (e) => {
+            let errorMsg = "音效加载失败：";
+            switch(e.target.error.code) {
+                case e.target.error.MEDIA_ERR_ABORTED: errorMsg += "用户中止加载"; break;
+                case e.target.error.MEDIA_ERR_NETWORK: errorMsg += "网络错误（请检查文件路径或网络）"; break;
+                case e.target.error.MEDIA_ERR_DECODE: errorMsg += "音频解码失败"; break;
+                case e.target.error.MEDIA_ERR_SRC_NOT_SUPPORTED: errorMsg += "音频格式不支持或文件不存在"; break;
+                default: errorMsg += "未知错误"; break;
+            }
+            updateStatus(errorMsg, "error");
+        });
+
+        // 播放按钮点击事件
+        playBtn.addEventListener('click', () => {
+            try {
+                soundPlayer.currentTime = 0; // 重置到开头
+                soundPlayer.play().then(() => {
+                    updateStatus("音效正在播放...", "success");
+                }).catch((err) => {
+                    updateStatus(`播放失败：${err.message}（请检查浏览器音频权限或文件）`, "error");
+                });
+            } catch (err) {
+                updateStatus(`操作失败：${err.message}`, "error");
+            }
+        });
+
+        // 播放结束监听
+        soundPlayer.addEventListener('ended', () => {
+            updateStatus("音效播放完毕，可再次点击播放", "success");
         });
     </script>
 </body>
