@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>自定义抽奖程序（含音效测试）</title>
+    <title>自定义抽奖程序</title>
     <style>
         /* 原有样式保持不变 */
         * { box-sizing: border-box; margin:0; padding:0; font-family: 'Arial', sans-serif; }
@@ -52,17 +52,15 @@
     <div id="input-page">
         <h2>抽奖配置输入</h2>
         <textarea id="config-input" placeholder="请输入配置（格式示例）：
-Title:聯歡大抽獎
-round 1 name:三獎
-round 2 name:二獎
-last round name:頭獎
-the rest members:3  // 抽奖时长（必填，正整数）
-the rest members name:安慰奖  // 安慰奖名称（必填）
+Title:工作項目抽籤
+round 1 name:A類名單
+round 2 name:B類名單
+the rest members:沒有抽中
+lucky draw effect time:2
 Members list:
-John
-Michael
 Albert
-Jimmy"></textarea>
+Tommy
+Perce"></textarea>
         <button id="submit-config">提交配置</button>
     </div>
 
@@ -73,7 +71,6 @@ Jimmy"></textarea>
             <div class="current-round" id="current-round"></div>
             <button class="start-btn" id="start-btn">開始抽獎</button>
             <button class="member-btn" id="view-members-btn">參與名單</button>
-            <!-- 新增：音效测试按钮 -->
             <button class="member-btn" id="test-sound-btn">测试音效</button>
             <button class="end-round-btn" id="end-round-btn" disabled>結束當前輪次</button>
         </div>
@@ -147,7 +144,7 @@ Jimmy"></textarea>
         const submitConfigBtn = document.getElementById('submit-config');
         const scrollHighlight = document.querySelector('.scroll-highlight');
         const viewMembersBtn = document.getElementById('view-members-btn');
-        const testSoundBtn = document.getElementById('test-sound-btn'); // 新增：获取测试按钮
+        const testSoundBtn = document.getElementById('test-sound-btn');
         const membersModal = document.getElementById('members-modal');
         const closeModalBtns = document.querySelectorAll('.close-modal');
         const modalMembersTextarea = document.getElementById('modal-members-textarea');
@@ -161,52 +158,49 @@ Jimmy"></textarea>
         const currentRoundEl = document.getElementById('current-round');
         const roundWinnersContainer = document.getElementById('round-winners-container');
 
-        // 配置解析函数（原有逻辑不变）
+        // 配置解析函数（核心修改：适配用户新配置格式）
         function parseConfig(inputText) {
             const lines = inputText.split('\n').map(line => line.trim()).filter(line => line !== '');
             let title = '';
             const roundNames = [];
-            let restMember = '';
-            let effectTime = 3;
+            let restMember = ''; // 安慰奖名称（来自the rest members）
+            let effectTime = 3; // 抽奖时长（来自lucky draw effect time）
             const members = [];
             let isCollectingMembers = false;
-
+            
             for (const line of lines) {
                 if (line.startsWith('Title:')) {
                     title = line.slice('Title:'.length).trim();
                 } else if (line.startsWith('round ') && line.includes(' name:')) {
                     const roundName = line.slice(line.indexOf('name:') + 5).trim();
                     if (roundName) roundNames.push(roundName);
-                } else if (line.startsWith('last round name:')) {
-                    const lastRound = line.slice('last round name:'.length).trim();
-                    if (lastRound) roundNames.push(lastRound);
+                } else if (line.startsWith('the rest members:')) {
+                    // 安慰奖名称：来自the rest members
+                    restMember = line.slice('the rest members:'.length).trim();
                 } else if (line.startsWith('lucky draw effect time:')) {
+                    // 抽奖时长：来自lucky draw effect time
                     const timeStr = line.slice('lucky draw effect time:'.length).trim();
-					console.log(timeStr);
-				    effectTime = parseInt(timeStr, 10);
-                } else if (line.startsWith('the rest members name:')) {
-                    restMember = line.slice('the rest members name:'.length).trim();
-					console.log(restMember);
-                } else if (line === 'Members list:') {
+                    effectTime = parseInt(timeStr, 10);
+                } else if (line.startsWith('Members list:')) {
                     isCollectingMembers = true;
                 } else if (isCollectingMembers) {
                     members.push(line);
                 }
             }
-
+            
+            // 错误验证（适配新键名）
             const errors = [];
             if (!title) errors.push('缺少标题（Title项）');
-            if (roundNames.length === 0) errors.push('缺少轮次名称（round x name/last round name项）');
-console.log(restMember);           
-		   if (!restMember) errors.push('缺少安慰奖名称（the rest members name项）');
-            if (isNaN(effectTime) || effectTime <= 0) errors.push('抽奖时长必须为正整数');
+            if (roundNames.length === 0) errors.push('缺少轮次名称（round X name项）');
+            if (!restMember) errors.push('缺少安慰奖名称（the rest members项）');
+            if (isNaN(effectTime) || effectTime <= 0) errors.push('抽奖时长必须为正整数（lucky draw effect time项）');
             if (members.length === 0) errors.push('缺少成员列表（Members list项）');
-
+            
             if (errors.length > 0) return { success: false, error: errors.join('\n') };
-
+            
             const uniqueMembers = [...new Set(members.map(m => m.trim()))].filter(m => m !== '');
             if (uniqueMembers.length === 0) return { success: false, error: '成员列表不能为空' };
-
+            
             return {
                 success: true,
                 data: { title, roundNames, restMember, effectTime, members: uniqueMembers }
@@ -277,7 +271,7 @@ console.log(restMember);
             scrollPosition = 0;
         }
 
-        // 提交配置处理（原有逻辑不变）
+        // 提交配置处理（原有逻辑不变，适配新解析结果）
         submitConfigBtn.addEventListener('click', () => {
             const inputText = configInput.value.trim();
             if (!inputText) {
@@ -293,17 +287,20 @@ console.log(restMember);
 
             const { title, roundNames, restMember, effectTime, members } = parseResult.data;
 
+            // 更新全局变量
             allRounds = [...roundNames, restMember];
             抽奖轮次 = roundNames;
             allNames = members;
             remainingNames = [...members];
-            effectTimeMs = effectTime * 1000;
+            effectTimeMs = effectTime * 1000; // 转换为毫秒
             restMemberName = restMember;
 
+            // 更新界面
             document.querySelector('.main-title').textContent = title;
             generateRoundWinnersRows();
             resetLotteryState();
 
+            // 切换显示
             document.getElementById('input-page').style.display = 'none';
             document.querySelector('.header-container').style.display = 'block';
             document.querySelector('.main-content').style.display = 'block';
@@ -466,7 +463,7 @@ console.log(restMember);
             }
         });
 
-        // 新增：音效测试按钮逻辑
+        // 音效测试按钮逻辑（原有逻辑不变）
         testSoundBtn.addEventListener('click', async () => {
             try {
                 // 1. 播放开始音效并等待结束
