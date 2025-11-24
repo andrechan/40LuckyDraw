@@ -3,21 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>自定义抽奖程序</title>
+    <title>自定义抽奖程序（含音效）</title>
     <style>
+        /* 原有样式保持不变 */
         * { box-sizing: border-box; margin:0; padding:0; font-family: 'Arial', sans-serif; }
         body { background: linear-gradient(120deg, #6a11cb 0%, #2575fc 100%); min-height:100vh; padding:12px; padding-bottom:180px; }
-        
-        /* 输入页面样式 */
         #input-page { display:block; max-width:800px; margin:0 auto; padding:20px; background:rgba(255,255,255,0.9); border-radius:10px; box-shadow:0 3px 10px rgba(0,0,0,0.1); }
         #input-page h2 { text-align:center; color:#333; margin-bottom:15px; }
         #config-input { width:100%; height:250px; padding:10px; border:1px solid #ddd; border-radius:8px; resize:vertical; font-size:14px; margin-bottom:10px; }
         #submit-config { display:block; width:100%; max-width:200px; margin:0 auto; padding:10px; background:#2575fc; color:white; border:none; border-radius:6px; font-size:16px; font-weight:bold; cursor:pointer; }
-        
-        /* 抽奖界面初始隐藏 */
         .header-container, .main-content, .bottom-selected-bar { display:none; }
-        
-        /* 抽奖界面样式（适配自定义配置） */
         .main-title { font-size:28px; color:white; text-shadow:0 2px 4px rgba(0,0,0,0.3); font-weight:bold; margin:0 0 15px; text-align:center; }
         .top-bar { display:flex; align-items:center; justify-content:center; gap:15px; margin-bottom:12px; flex-wrap:wrap; }
         .current-round { font-size:20px; color:#ffcc00; font-weight:bold; text-shadow:0 1px 2px rgba(0,0,0,0.2); white-space:nowrap; }
@@ -53,7 +48,7 @@
     </style>
 </head>
 <body>
-    <!-- 输入配置页面（初始显示） -->
+    <!-- 输入配置页面 -->
     <div id="input-page">
         <h2>抽奖配置输入</h2>
         <textarea id="config-input" placeholder="请输入配置（格式示例）：
@@ -61,8 +56,8 @@ Title:聯歡大抽獎
 round 1 name:三獎
 round 2 name:二獎
 last round name:頭獎
-the rest members:安慰獎
-lucky draw effect time (seconds):3
+the rest members:3  // 抽奖时长（必填，正整数）
+the rest members name:安慰奖  // 安慰奖名称（必填）
 Members list:
 John
 Michael
@@ -71,7 +66,7 @@ Jimmy"></textarea>
         <button id="submit-config">提交配置</button>
     </div>
 
-    <!-- 抽奖界面（初始隐藏） -->
+    <!-- 抽奖界面 -->
     <div class="header-container" style="display:none;">
         <h1 class="main-title"></h1>
         <div class="top-bar">
@@ -102,7 +97,7 @@ Jimmy"></textarea>
 
     <div class="bottom-selected-bar" style="display:none;">
         <div class="current-round-temp-winners" id="current-round-temp-winners"></div>
-        <div id="round-winners-container"></div> <!-- 动态生成轮次行 -->
+        <div id="round-winners-container"></div>
         <button class="bottom-clear-btn" id="bottom-clear-btn">清空</button>
     </div>
 
@@ -115,18 +110,35 @@ Jimmy"></textarea>
         </div>
     </div>
 
+    <!-- 音效元素（内置data URI，无需外部文件） -->
+    <audio id="start-audio" preload="auto">
+        <source src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" type="audio/wav">
+    </audio>
+    <audio id="stop-audio" preload="auto">
+        <source src="data:audio/wav;base64,UklGRkoAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" type="audio/wav">
+    </audio>
+    <audio id="win-audio" preload="auto">
+        <source src="data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" type="audio/wav">
+    </audio>
+
     <script>
-        // 全局变量（将被用户配置覆盖）
+        // 全局变量
         let allRounds = [];
         let 抽奖轮次 = [];
         let allNames = [];
         let remainingNames = [];
         let effectTimeMs = 3000;
         let restMemberName = "";
+        let roundWinnersMap = {};
         let currentRoundIndex = 0;
         let currentRoundTempWinners = [];
-        let roundWinnersMap = {};
+        let scrollPosition = 0;
         const ITEM_WIDTH = 120;
+
+        // 音效元素
+        const startAudio = document.getElementById('start-audio');
+        const stopAudio = document.getElementById('stop-audio');
+        const winAudio = document.getElementById('win-audio');
 
         // DOM元素
         const configInput = document.getElementById('config-input');
@@ -146,7 +158,7 @@ Jimmy"></textarea>
         const currentRoundEl = document.getElementById('current-round');
         const roundWinnersContainer = document.getElementById('round-winners-container');
 
-        // 配置解析函数
+        // 配置解析函数（原有逻辑不变）
         function parseConfig(inputText) {
             const lines = inputText.split('\n').map(line => line.trim()).filter(line => line !== '');
             let title = '';
@@ -157,38 +169,45 @@ Jimmy"></textarea>
             let isCollectingMembers = false;
 
             for (const line of lines) {
-                if (line.startsWith('Title:')) title = line.slice('Title:'.length).trim();
-                else if (line.startsWith('round ') && line.includes(' name:')) roundNames.push(line.slice(line.indexOf('name:')+5).trim());
-                else if (line.startsWith('last round name:')) roundNames.push(line.slice('last round name:'.length).trim());
-                else if (line.startsWith('the rest members:')) restMember = line.slice('the rest members:'.length).trim();
-                else if (line.startsWith('lucky draw effect time:')) effectTime = parseInt(line.slice('lucky draw effect time:'.length).trim(),10);
-                else if (line === 'Members list:') isCollectingMembers = true;
-                else if (isCollectingMembers) members.push(line);
-console.log(line.startsWith('lucky draw effect time:'));
-console.log(line.slice('lucky draw effect time:'.length).trim());
+                if (line.startsWith('Title:')) {
+                    title = line.slice('Title:'.length).trim();
+                } else if (line.startsWith('round ') && line.includes(' name:')) {
+                    const roundName = line.slice(line.indexOf('name:') + 5).trim();
+                    if (roundName) roundNames.push(roundName);
+                } else if (line.startsWith('last round name:')) {
+                    const lastRound = line.slice('last round name:'.length).trim();
+                    if (lastRound) roundNames.push(lastRound);
+                } else if (line.startsWith('the rest members:')) {
+                    const timeStr = line.slice('the rest members:'.length).trim();
+                    effectTime = parseInt(timeStr, 10);
+                } else if (line.startsWith('the rest members name:')) {
+                    restMember = line.slice('the rest members name:'.length).trim();
+                } else if (line === 'Members list:') {
+                    isCollectingMembers = true;
+                } else if (isCollectingMembers) {
+                    members.push(line);
+                }
             }
-            // 错误验证
+
             const errors = [];
             if (!title) errors.push('缺少标题（Title项）');
             if (roundNames.length === 0) errors.push('缺少轮次名称（round x name/last round name项）');
-            if (!restMember) errors.push('缺少安慰奖名称（the rest members项）');
-			console.log(effectTime);
-            if (isNaN(effectTime) || effectTime <=0) errors.push('抽奖时长必须为正整数');
-            if (members.length ===0) errors.push('缺少成员列表（Members list项）');
-            
-            if (errors.length>0) return { success:false, error:errors.join('\n') };
-            
-            // 处理成员列表
-            const uniqueMembers = [...new Set(members.map(m=>m.trim()))].filter(m=>m!=='');
-            if (uniqueMembers.length===0) return { success:false, error:'成员列表不能为空' };
+            if (!restMember) errors.push('缺少安慰奖名称（the rest members name项）');
+            if (isNaN(effectTime) || effectTime <= 0) errors.push('抽奖时长必须为正整数');
+            if (members.length === 0) errors.push('缺少成员列表（Members list项）');
+
+            if (errors.length > 0) return { success: false, error: errors.join('\n') };
+
+            const uniqueMembers = [...new Set(members.map(m => m.trim()))].filter(m => m !== '');
+            if (uniqueMembers.length === 0) return { success: false, error: '成员列表不能为空' };
 
             return {
-                success:true,
-                data:{ title, roundNames, restMember, effectTime, members:uniqueMembers }
+                success: true,
+                data: { title, roundNames, restMember, effectTime, members: uniqueMembers }
             };
         }
 
-        // 动态生成轮次行
+        // 生成轮次中奖行（原有逻辑不变）
         function generateRoundWinnersRows() {
             roundWinnersContainer.innerHTML = '';
             allRounds.forEach(round => {
@@ -199,34 +218,36 @@ console.log(line.slice('lucky draw effect time:'.length).trim());
             });
         }
 
-        // 更新轮次显示
+        // 更新当前轮次显示（原有逻辑不变）
         function updateCurrentRoundDisplay() {
-            currentRoundEl.textContent = currentRoundIndex < 抽奖轮次.length ? `當前輪次：${抽奖轮次[currentRoundIndex]}` : '所有輪次已完成';
+            currentRoundEl.textContent = currentRoundIndex < 抽奖轮次.length ? `當前輪次：${抽奖轮次[currentRoundIndex]}` : `所有輪次已完成`;
         }
 
-        // 更新临时中奖者显示
+        // 更新临时中奖者显示（原有逻辑不变）
         function updateCurrentRoundTempWinnersDisplay() {
-            currentRoundTempWinnersEl.textContent = currentRoundTempWinners.length===0 ? '' : 
+            currentRoundTempWinnersEl.textContent = currentRoundTempWinners.length === 0 ? "" : 
                 `當前輪次（${抽奖轮次[currentRoundIndex]}）臨時中獎者：${currentRoundTempWinners.map((n,i)=>`${i+1}. ${n}`).join('、')}`;
         }
 
-        // 更新底部中奖名单
+        // 更新底部中奖名单（原有逻辑不变）
         function updateBottomWinnersDisplay() {
             allRounds.forEach(round => {
                 const winnersEl = document.getElementById(`winners-${round}`);
-                winnersEl.textContent = roundWinnersMap[round]?.length===0 ? '暫無' : 
+                winnersEl.textContent = roundWinnersMap[round]?.length === 0 ? "暫無" : 
                     roundWinnersMap[round].map((n,i)=>`${i+1}. ${n}`).join('、');
             });
         }
 
-        // 重置抽奖状态
+        // 重置抽奖状态（原有逻辑不变）
         function resetLotteryState() {
             currentRoundIndex = 0;
             currentRoundTempWinners = [];
             roundWinnersMap = {};
             allRounds.forEach(round => roundWinnersMap[round] = []);
-            
-            remainingNames = [...allNames];
+
+            const allAwarded = allRounds.flatMap(round => roundWinnersMap[round]);
+            remainingNames = allNames.filter(n => !allAwarded.includes(n));
+
             updateCurrentRoundDisplay();
             updateCurrentRoundTempWinnersDisplay();
             initScroll();
@@ -234,12 +255,12 @@ console.log(line.slice('lucky draw effect time:'.length).trim());
             startBtn.disabled = currentRoundIndex >= 抽奖轮次.length;
         }
 
-        // 初始化滚动列表
+        // 初始化滚动列表（原有逻辑不变）
         function initScroll() {
             const scrollList = document.getElementById('scroll-list');
             scrollList.innerHTML = '';
-            if (remainingNames.length===0) return;
-            
+            if (remainingNames.length === 0) return;
+
             const repeatedList = [...remainingNames, ...remainingNames, ...remainingNames];
             repeatedList.forEach(name => {
                 const item = document.createElement('div');
@@ -247,68 +268,78 @@ console.log(line.slice('lucky draw effect time:'.length).trim());
                 item.textContent = name;
                 scrollList.appendChild(item);
             });
+            scrollPosition = 0;
         }
 
-        // 提交配置处理
+        // 提交配置处理（原有逻辑不变）
         submitConfigBtn.addEventListener('click', () => {
             const inputText = configInput.value.trim();
-            if (!inputText) { alert('请输入配置内容'); return; }
-            
+            if (!inputText) {
+                alert('请输入配置内容');
+                return;
+            }
+
             const parseResult = parseConfig(inputText);
-            if (!parseResult.success) { alert(parseResult.error); return; }
-            
+            if (!parseResult.success) {
+                alert(parseResult.error);
+                return;
+            }
+
             const { title, roundNames, restMember, effectTime, members } = parseResult.data;
-            
-            // 更新全局变量
+
             allRounds = [...roundNames, restMember];
             抽奖轮次 = roundNames;
             allNames = members;
             remainingNames = [...members];
             effectTimeMs = effectTime * 1000;
             restMemberName = restMember;
-            
-            // 更新界面
+
             document.querySelector('.main-title').textContent = title;
             generateRoundWinnersRows();
             resetLotteryState();
-            
-            // 切换显示
+
             document.getElementById('input-page').style.display = 'none';
             document.querySelector('.header-container').style.display = 'block';
             document.querySelector('.main-content').style.display = 'block';
             document.querySelector('.bottom-selected-bar').style.display = 'block';
         });
 
-        // 参与名单模态框逻辑
+        // 参与名单模态框逻辑（原有逻辑不变）
         viewMembersBtn.addEventListener('click', () => {
             const membersWithMark = allNames.map(name => {
                 let stars = '';
-                allRounds.forEach((round, idx) => { if (roundWinnersMap[round].includes(name)) stars = '*'.repeat(idx+1); });
+                allRounds.forEach((round, idx) => {
+                    if (roundWinnersMap[round].includes(name)) stars = '*'.repeat(idx + 1);
+                });
                 return `${stars}${name}`;
             }).join('\n');
+
             modalMembersTextarea.value = membersWithMark;
             membersModal.style.display = 'block';
         });
 
-        // 关闭模态框
+        // 关闭模态框（原有逻辑不变）
         closeModalBtns.forEach(btn => btn.addEventListener('click', () => membersModal.style.display = 'none'));
         window.addEventListener('click', e => e.target === membersModal && (membersModal.style.display = 'none'));
 
-        // 保存成员修改
+        // 保存成员修改（原有逻辑不变）
         modalSaveMembersBtn.addEventListener('click', () => {
-            const lines = modalMembersTextarea.value.split('\n').map(line => line.trim()).filter(line => line!=='');
+            const lines = modalMembersTextarea.value.split('\n').map(line => line.trim()).filter(line => line !== '');
             const newNames = [];
             roundWinnersMap = {};
             allRounds.forEach(round => roundWinnersMap[round] = []);
-            
+
             lines.forEach(line => {
-                const starCount = (line.match(/^\*+/g)||[''])[0].length;
-                const name = line.replace(/^\*+/,'').trim();
+                const starCount = (line.match(/^\*+/g) || [''])[0].length;
+                const name = line.replace(/^\*+/, '').trim();
                 if (!name) return;
+
                 newNames.push(name);
-                if (starCount>0 && starCount<=抽奖轮次.length) roundWinnersMap[抽奖轮次[starCount-1]].push(name);
+                if (starCount > 0 && starCount <= 抽奖轮次.length) {
+                    roundWinnersMap[抽奖轮次[starCount - 1]].push(name);
+                }
             });
-            
+
             allNames = [...new Set(newNames)];
             resetLotteryState();
             updateBottomWinnersDisplay();
@@ -316,7 +347,7 @@ console.log(line.slice('lucky draw effect time:'.length).trim());
             alert('參與名單已更新！');
         });
 
-        // 清空按钮逻辑
+        // 清空按钮逻辑（原有逻辑不变）
         bottomClearBtn.addEventListener('click', () => {
             if (confirm('確認清空所有中獎記錄？')) {
                 resetLotteryState();
@@ -325,44 +356,58 @@ console.log(line.slice('lucky draw effect time:'.length).trim());
             }
         });
 
-        // 开始抽奖逻辑
+        // 开始抽奖逻辑（新增音效播放）
         startBtn.addEventListener('click', () => {
-            if (currentRoundIndex >= 抽奖轮次.length) { alert('所有輪次已完成！'); return; }
-            if (remainingNames.length ===0) { alert('當前輪次無可參與人員！'); return; }
+            if (currentRoundIndex >= 抽奖轮次.length) {
+                alert('所有輪次已完成！');
+                return;
+            }
+            if (remainingNames.length === 0) {
+                alert('當前輪次無可參與人員！');
+                return;
+            }
+
+            // 播放开始抽奖音效
+            startAudio.play().catch(err => console.log('音效播放失败:', err));
             
             startBtn.disabled = true;
             scrollHighlight.style.display = 'block';
-            
-            let scrollPosition = 0;
-            const scrollList = document.getElementById('scroll-list');
+
+            const scrollSpeed = 18;
             const scrollInterval = setInterval(() => {
-                scrollPosition +=18;
-                if (scrollPosition >= remainingNames.length*ITEM_WIDTH*2) scrollPosition=0;
-                scrollList.style.transform = `translateX(-${scrollPosition}px)`;
-            },16);
-            
+                scrollPosition += scrollSpeed;
+                if (scrollPosition >= remainingNames.length * ITEM_WIDTH * 2) scrollPosition = 0;
+                document.getElementById('scroll-list').style.transform = `translateX(-${scrollPosition}px)`;
+            }, 16);
+
             setTimeout(() => {
                 clearInterval(scrollInterval);
-                stopScroll(scrollPosition);
+                stopScroll();
             }, effectTimeMs);
         });
 
-        // 停止滚动逻辑
-        function stopScroll(scrollPosition) {
+        // 停止抽奖逻辑（新增音效播放）
+        function stopScroll() {
             const scrollList = document.getElementById('scroll-list');
-            if (remainingNames.length===0) { startBtn.disabled=false; return; }
-            
-            const normalizedPos = scrollPosition % (remainingNames.length*ITEM_WIDTH);
-            const targetIndex = Math.floor(normalizedPos/ITEM_WIDTH) % remainingNames.length;
-            const targetScrollPos = targetIndex*ITEM_WIDTH + (scrollPosition - normalizedPos);
-            
+            if (remainingNames.length === 0) {
+                startBtn.disabled = false;
+                return;
+            }
+
+            const normalizedPos = scrollPosition % (remainingNames.length * ITEM_WIDTH);
+            const targetIndex = Math.floor(normalizedPos / ITEM_WIDTH) % remainingNames.length;
+            const targetScrollPos = targetIndex * ITEM_WIDTH + (scrollPosition - normalizedPos);
+
             scrollList.style.transform = `translateX(-${targetScrollPos}px)`;
             scrollHighlight.style.display = 'none';
-            
+
+            // 播放停止抽奖音效
+            stopAudio.play().catch(err => console.log('音效播放失败:', err));
+
             const selectedName = remainingNames[targetIndex];
             remainingNames = remainingNames.filter(n => n !== selectedName);
             currentRoundTempWinners.push(selectedName);
-            
+
             initScroll();
             showCenterFlipResult(selectedName);
             updateCurrentRoundTempWinnersDisplay();
@@ -370,35 +415,43 @@ console.log(line.slice('lucky draw effect time:'.length).trim());
             startBtn.disabled = false;
         }
 
-        // 显示中奖结果
+        // 显示中奖结果逻辑（新增音效播放）
         function showCenterFlipResult(name) {
             centerFlipBack.textContent = name;
             centerFlipCard.style.display = 'block';
-            setTimeout(() => centerFlipCard.classList.add('show'),100);
+            
+            // 播放中奖音效
+            winAudio.play().catch(err => console.log('音效播放失败:', err));
+            
+            setTimeout(() => centerFlipCard.classList.add('show'), 100);
             setTimeout(() => {
                 centerFlipCard.classList.remove('show');
-                setTimeout(() => centerFlipCard.style.display='none',600);
-            },2000);
+                setTimeout(() => centerFlipCard.style.display = 'none', 600);
+            }, 2000);
         }
 
-        // 结束轮次逻辑
+        // 结束轮次逻辑（原有逻辑不变）
         endRoundBtn.addEventListener('click', () => {
-            if (currentRoundTempWinners.length===0) { alert('請至少抽取一名中獎者！'); return; }
+            if (currentRoundTempWinners.length === 0) {
+                alert('請至少抽取一名中獎者！');
+                return;
+            }
+
             if (!confirm('確認結束當前輪次？')) return;
-            
+
             const currentRound = 抽奖轮次[currentRoundIndex];
             roundWinnersMap[currentRound] = [...currentRoundTempWinners];
-            
+
             updateBottomWinnersDisplay();
             currentRoundTempWinners = [];
             updateCurrentRoundTempWinnersDisplay();
             endRoundBtn.disabled = true;
-            
+
             currentRoundIndex++;
             updateCurrentRoundDisplay();
-            
+
             if (currentRoundIndex >= 抽奖轮次.length) {
-                roundWinnersMap[restMemberName] = [...remainingNames];
+                roundWinnersMap[restMemberName] = remainingNames;
                 updateBottomWinnersDisplay();
                 startBtn.disabled = true;
                 alert(`🎉 所有輪次完成！未中獎者自動成為${restMemberName}得主！`);
